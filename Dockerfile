@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install Ansible
 ARG ANSIBLE_VERSION
-RUN pip install ansible==$ANSIBLE_VERSION
+RUN pip install ansible-core==$ANSIBLE_VERSION
 
 # Copy the current directory contents into the container at /app
 COPY . /app
