@@ -31,6 +31,6 @@ jobs:
         VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
         [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
         [ "$VERSION" == "main" ] && VERSION=latest
-        echo IMAGE_ID=$IMAGE_ID
-        podman push $IMAGE_NAME $IMAGE_ID:latest
         podman push $IMAGE_NAME $IMAGE_ID:$ANSIBLE_VERSION
+        podman push $IMAGE_NAME $IMAGE_ID:latest
+        
