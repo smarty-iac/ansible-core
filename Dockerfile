@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install Ansible
-ARG ANSIBLE_VERSION=latest
+ARG ANSIBLE_VERSION
 RUN pip install ansible==$ANSIBLE_VERSION
 
 # Copy the current directory contents into the container at /app
