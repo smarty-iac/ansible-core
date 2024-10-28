@@ -3,12 +3,12 @@ FROM python:3.11-slim
 ARG ANSIBLE_VERSION
 
 # Set the working directory in the container
-RUN useradd -d /workdir -m -s /bin/bash ansible
+RUN useradd -m -s /bin/bash ansible
 WORKDIR /workdir
 
 # Install Ansible
+RUN pip install --upgrade pip
 RUN pip install ansible-core==$ANSIBLE_VERSION
-RUN useradd -d /workdir -m -s /bin/bash ansible
 
 # Use user ansible
 USER ansible
