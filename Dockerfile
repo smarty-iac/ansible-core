@@ -3,15 +3,13 @@ FROM python:3.11-slim
 ARG ANSIBLE_VERSION
 
 # Set the working directory in the container
-RUN useradd -m -s /bin/bash ansible
-WORKDIR /workdir
+WORKDIR /workplace
 
 # Install Ansible
 RUN pip install --upgrade pip
 RUN pip install ansible-core==$ANSIBLE_VERSION
 
 # Use user ansible
-USER ansible
 
 # Run a simple command to verify Ansible installation
 CMD ["ansible", "--version"]
