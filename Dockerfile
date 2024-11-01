@@ -6,8 +6,11 @@ ARG ANSIBLE_VERSION
 WORKDIR /workplace
 
 # Install Ansible
+RUN apt-get install less
 RUN pip install --upgrade pip
+RUN pip install boto3
 RUN pip install ansible-core==$ANSIBLE_VERSION
+
 
 # Use user ansible
 
