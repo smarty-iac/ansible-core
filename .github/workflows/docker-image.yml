@@ -8,7 +8,7 @@ on:
 
 env:
   IMAGE_NAME: ansible-core
-  ANSIBLE_VERSION: "2.17.5"  # Specify the required Ansible version here
+  ANSIBLE_VERSION: "2.18.0"  # Specify the required Ansible version here
   
 
 jobs:
