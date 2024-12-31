@@ -29,6 +29,8 @@ jobs:
     - name: Extract version and enrichment tag
       id: vars
       run: |
+        echo "Repository: ${{ github.repository }}"
+        echo "Repository Owner: ${{ github.repository_owner }}"
         VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
         VERSION=$(echo $VERSION | sed -e 's/^v//')
         ANSIBLE_VERSION=$(echo $VERSION | sed -e 's/-.*//')
