@@ -31,6 +31,12 @@ jobs:
         VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
         [[ "${{ github.ref }}" == "refs/tags/"* ]] && VERSION=$(echo $VERSION | sed -e 's/^v//')
         [ "$VERSION" == "main" ] && VERSION=latest
-        podman push $IMAGE_NAME $IMAGE_ID:$ANSIBLE_VERSION
+
+        # Custom tagging logic
+        if [[ "$VERSION" =~ ^2\.18\.0-smarty[0-9]+\.[0-9]+$ ]]; then
+          ENRICHMENT_TAG=$(echo $VERSION | sed -e 's/^2\.18\.0-//')
+          podman push $IMAGE_NAME $IMAGE_ID:$ENRICHMENT_TAG
+        fi
+
+        podman push $IMAGE_NAME $IMAGE_ID:$VERSION
         podman push $IMAGE_NAME $IMAGE_ID:latest
-        
