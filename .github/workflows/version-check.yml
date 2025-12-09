@@ -1,0 +1,74 @@
+name: Check for New Ansible Version
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'  # Every Monday at noon UTC
+  workflow_dispatch:
+
+jobs:
+  check-new-version:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0  # Fetch all tags
+    
+    - name: Get latest ansible-core version
+      id: get-version
+      run: |
+        LATEST=$(curl -s https://pypi.org/pypi/ansible-core/json | jq -r '.info.version')
+        echo "latest=$LATEST" >> $GITHUB_OUTPUT
+        echo "Latest ansible-core version: $LATEST"
+    
+    - name: Get current latest tag
+      id: current-tag
+      run: |
+        CURRENT=$(git tag -l '*-smarty*' | sort -V | tail -1)
+        CURRENT_VERSION=$(echo $CURRENT | sed -e 's/-.*//')
+        echo "current=$CURRENT" >> $GITHUB_OUTPUT
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current latest tag: $CURRENT (Ansible: $CURRENT_VERSION)"
+    
+    - name: Compare versions
+      id: compare
+      run: |
+        LATEST="${{ steps.get-version.outputs.latest }}"
+        CURRENT="${{ steps.current-tag.outputs.current_version }}"
+        
+        if [ "$LATEST" != "$CURRENT" ]; then
+          echo "new_version_available=true" >> $GITHUB_OUTPUT
+          echo "🆕 New version available: $LATEST (current: $CURRENT)"
+        else
+          echo "new_version_available=false" >> $GITHUB_OUTPUT
+          echo "✅ Already on latest version: $CURRENT"
+        fi
+    
+    - name: Create issue for new version
+      if: steps.compare.outputs.new_version_available == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const latest = '${{ steps.get-version.outputs.latest }}';
+          const current = '${{ steps.current-tag.outputs.current_version }}';
+          
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: ['ansible-update']
+          });
+          
+          const existingIssue = issues.data.find(issue => 
+            issue.title.includes(latest)
+          );
+          
+          if (!existingIssue) {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `New ansible-core version available: ${latest}`,
+              body: `A new version of ansible-core is available on PyPI.\n\n**Current version:** ${current}\n**New version:** ${latest}\n\n**To update:**\n1. Create a new tag: \`git tag ${latest}-smarty1.4 && git push origin ${latest}-smarty1.4\`\n2. Or trigger the workflow manually with the new version\n3. Or wait for the weekly auto-build\n\n[View on PyPI](https://pypi.org/project/ansible-core/${latest}/)`,
+              labels: ['ansible-update', 'enhancement']
+            });
+          }

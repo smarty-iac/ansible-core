@@ -4,10 +4,51 @@ on:
   push:
     tags:
       - '*-smarty*'
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly check on Sundays at midnight UTC
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      ansible_version:
+        description: 'Ansible version to build (leave empty for latest)'
+        required: false
+        type: string
 
 jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      latest_version: ${{ steps.get-version.outputs.version }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+    - name: Get latest ansible-core version
+      id: get-version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.ansible_version }}" ]; then
+          VERSION="${{ github.event.inputs.ansible_version }}"
+        else
+          VERSION=$(curl -s https://pypi.org/pypi/ansible-core/json | jq -r '.info.version')
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Latest/Selected ansible-core version: $VERSION"
+    
+    - name: Check if version exists on PyPI
+      id: check
+      run: |
+        VERSION="${{ steps.get-version.outputs.version }}"
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/ansible-core/$VERSION/json")
+        if [ "$STATUS" = "200" ]; then
+          echo "should_build=true" >> $GITHUB_OUTPUT
+          echo "Version $VERSION exists on PyPI"
+        else
+          echo "should_build=false" >> $GITHUB_OUTPUT
+          echo "Version $VERSION not found on PyPI"
+          exit 1
+        fi
+
   build:
     runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true' || github.event_name == 'push'
 
     steps:
     - name: Checkout repository
@@ -29,22 +70,37 @@ jobs:
     - name: Extract version and enrichment tag
       id: vars
       run: |
-        VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-        VERSION=$(echo $VERSION | sed -e 's/^v//')
-        ANSIBLE_VERSION=$(echo $VERSION | sed -e 's/-.*//')
-        ENRICHMENT_TAG=$(echo $VERSION | sed -e 's/^[0-9.]*-//')
+        if [ "${{ github.event_name }}" = "push" ]; then
+          # Tag-based build
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          VERSION=$(echo $VERSION | sed -e 's/^v//')
+          ANSIBLE_VERSION=$(echo $VERSION | sed -e 's/-.*//')
+          ENRICHMENT_TAG=$(echo $VERSION | sed -e 's/^[0-9.]*-//')
+        else
+          # Scheduled or manual build
+          ANSIBLE_VERSION="${{ needs.check-version.outputs.latest_version }}"
+          TIMESTAMP=$(date +%Y%m%d)
+          ENRICHMENT_TAG="smarty-auto-${TIMESTAMP}"
+          VERSION="${ANSIBLE_VERSION}-${ENRICHMENT_TAG}"
+        fi
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "ANSIBLE_VERSION=$ANSIBLE_VERSION" >> $GITHUB_ENV
         echo "ENRICHMENT_TAG=$ENRICHMENT_TAG" >> $GITHUB_ENV
+        echo "Building version: $VERSION (Ansible: $ANSIBLE_VERSION)"
 
     - name: Build Docker image
       run: |
         docker build --build-arg ANSIBLE_VERSION=${{ env.ANSIBLE_VERSION }} -t ghcr.io/${{ github.repository }}:${{ env.VERSION }} .
         docker tag ghcr.io/${{ github.repository }}:${{ env.VERSION }} ghcr.io/${{ github.repository }}:${{ env.ENRICHMENT_TAG }}
         docker tag ghcr.io/${{ github.repository }}:${{ env.VERSION }} ghcr.io/${{ github.repository }}:latest
+        # Add major.minor version tag
+        MAJOR_MINOR=$(echo ${{ env.ANSIBLE_VERSION }} | cut -d. -f1,2)
+        docker tag ghcr.io/${{ github.repository }}:${{ env.VERSION }} ghcr.io/${{ github.repository }}:${MAJOR_MINOR}-latest
 
     - name: Push Docker image
       run: |
         docker push ghcr.io/${{ github.repository }}:${{ env.VERSION }}
         docker push ghcr.io/${{ github.repository }}:${{ env.ENRICHMENT_TAG }}
         docker push ghcr.io/${{ github.repository }}:latest
+        MAJOR_MINOR=$(echo ${{ env.ANSIBLE_VERSION }} | cut -d. -f1,2)
+        docker push ghcr.io/${{ github.repository }}:${MAJOR_MINOR}-latest
