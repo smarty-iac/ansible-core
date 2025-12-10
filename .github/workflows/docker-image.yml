@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '*-smarty*'
+    branches:
+      - '**'  # Build on all branches
   schedule:
     - cron: '0 0 * * 0'  # Weekly check on Sundays at midnight UTC
   workflow_dispatch:  # Allow manual triggering
@@ -70,12 +72,20 @@ jobs:
     - name: Extract version and enrichment tag
       id: vars
       run: |
-        if [ "${{ github.event_name }}" = "push" ]; then
+        if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "tag" ]; then
           # Tag-based build
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
           VERSION=$(echo $VERSION | sed -e 's/^v//')
           ANSIBLE_VERSION=$(echo $VERSION | sed -e 's/-.*//')
           ENRICHMENT_TAG=$(echo $VERSION | sed -e 's/^[0-9.]*-//')
+        elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
+          # Branch-based build
+          ANSIBLE_VERSION="${{ needs.check-version.outputs.latest_version }}"
+          BRANCH_NAME=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          BRANCH_NAME=$(echo $BRANCH_NAME | sed -e 's/[^a-zA-Z0-9._-]/-/g')
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          ENRICHMENT_TAG="smarty-${BRANCH_NAME}-${TIMESTAMP}"
+          VERSION="${ANSIBLE_VERSION}-${ENRICHMENT_TAG}"
         else
           # Scheduled or manual build
           ANSIBLE_VERSION="${{ needs.check-version.outputs.latest_version }}"
