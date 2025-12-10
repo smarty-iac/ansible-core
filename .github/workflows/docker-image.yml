@@ -107,6 +107,12 @@ jobs:
         MAJOR_MINOR=$(echo ${{ env.ANSIBLE_VERSION }} | cut -d. -f1,2)
         docker tag ghcr.io/${{ github.repository }}:${{ env.VERSION }} ghcr.io/${{ github.repository }}:${MAJOR_MINOR}-latest
 
+    - name: Test Docker image
+      run: |
+        echo "Testing ansible-core container..."
+        docker run --rm ghcr.io/${{ github.repository }}:${{ env.VERSION }} ansible --version
+        echo "Container test passed successfully!"
+
     - name: Push Docker image
       run: |
         docker push ghcr.io/${{ github.repository }}:${{ env.VERSION }}
