@@ -7,7 +7,7 @@ WORKDIR /workplace
 
 # Install Ansible
 RUN apt-get update
-RUN apt-get -y install less openssh-client netavark
+RUN apt-get -y install less openssh-client netavark git
 RUN pip install --upgrade pip
 RUN pip install boto3
 RUN pip install ansible-core==$ANSIBLE_VERSION
